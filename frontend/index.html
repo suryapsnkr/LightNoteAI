@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Video Editor</title>
+    <style>body { font-family: Arial; padding: 20px; }</style>
+</head>
+<body>
+    <h1>🎬 LIGHTNOTEAI Editor</h1>
+    <input type="file" id="videoInput" accept="video/*"><br><br>
+    <input type="file" id="refInput" accept="image/*"><br><br>
+    <textarea id="prompt" placeholder='e.g. "Replace the Coca-Cola bottle with Pepsi"' rows="3" cols="50"></textarea><br>
+    <button onclick="start()">🚀 Process</button>
+    <div id="status" style="margin:20px 0; font-weight:bold;"></div>
+    <video id="outputVideo" controls width="600" style="display:none;" type="video/mp4"></video>
+
+    <script>
+        const BASE = "http://localhost:8000";
+
+        async function start() {
+            const video = document.getElementById('videoInput').files[0];
+            const ref = document.getElementById('refInput').files[0];
+            const prompt = document.getElementById('prompt').value;
+            if (!video) return alert("Upload a video");
+
+            const form = new FormData();
+            form.append('video', video);
+            form.append('prompt', prompt);
+            if (ref) form.append('reference', ref);
+
+            const res = await fetch(`${BASE}/upload`, { method: 'POST', body: form });
+            const { task_id } = await res.json();
+            document.getElementById('status').innerText = "Task Queued...";
+
+            const interval = setInterval(async () => {
+                const statusRes = await fetch(`${BASE}/status/${task_id}`);
+                const data = await statusRes.json();
+                if (data.status === 'SUCCESS') {
+                    clearInterval(interval);
+                    document.getElementById('status').innerText = "✅ Done!";
+                    const videoEl = document.getElementById('outputVideo');
+                    videoEl.src = `${BASE}${data.result_url}`;
+                    videoEl.load();
+                    videoEl.style.display = 'block';
+                } else if (data.status === 'FAILURE') {
+                    clearInterval(interval);
+                    document.getElementById('status').innerText = "❌ Error: " + data.error;
+                } else {
+                    document.getElementById('status').innerText = `${data.status} - ${data.progress || 0}%`;
+                }
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
